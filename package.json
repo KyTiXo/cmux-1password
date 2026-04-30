@@ -1,0 +1,7 @@
+{
+  "name": "cmux-1password",
+  "private": true,
+  "scripts": {
+    "lint": "./test/shellcheck.sh"
+  }
+}

@@ -1,173 +1,119 @@
-# tmux-1password
+# cmux-1password
 
-[![Build Status](https://github.com/yardnsm/tmux-1password/workflows/main/badge.svg)](https://github.com/yardnsm/tmux-1password/actions)
+> summon secrets. stay frosty.
 
-> Access your 1Password login items within tmux!
+Shell-first 1Password picker for `tmux`, tuned to behave better inside `cmux`.
 
-https://user-images.githubusercontent.com/11786506/159118616-9983fca2-edb5-4d0b-b827-43088e84d2c8.mp4
+It keeps the raw `.sh` shape from [`tmux-1password`](https://github.com/yardnsm/tmux-1password), but if it detects `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` it will:
 
-This plugin allows you to access you 1Password items within tmux, using 1Password's CLI. It works
-for personal 1Password accounts, as well as teams accounts.
+- send the selected secret back through the active `cmux` surface
+- set a sidebar status pill / progress hint when 1Password needs attention
+- fire a `cmux notify` when unlock/sign-in gets blocked
+
+No Electron blob. No framework sermon. Just shell, `fzf`, `op`, and a keybind.
+
+## What It Does
+
+- `prefix + u` opens the picker
+- `Enter` sends the password
+- `Ctrl+u` sends the OTP/TOTP
+- optional clipboard mode still works
+- tmux path stays intact
 
 ## Requirements
 
-This plugin relies on the following:
-
-- [1Password CLI](https://developer.1password.com/docs/cli) >= 2.0.0
-- [fzf](https://github.com/junegunn/fzf)
-- [jq](https://stedolan.github.io/jq/)
-
-## Key bindings
-
-In any tmux mode:
-
-- `prefix + u` - list login items in a bottom pane.
+- [`op`](https://developer.1password.com/docs/cli)
+- [`jq`](https://jqlang.org/)
+- [`fzf`](https://github.com/junegunn/fzf)
+- [`tmux`](https://github.com/tmux/tmux) for the plugin bind path
+- [`cmux`](https://github.com/manaflow-ai/cmux) if you want the extra workspace-aware behavior
 
 ## Install
 
-### Using [Tmux Plugin Manager](https://github.com/tmux-plugins/tpm) (recommended)
+### TPM
 
-1. Add plugin to the list of TPM plugins in `.tmux.conf`:
-
-    ```
-    set -g @plugin 'yardnsm/tmux-1password'
-    ```
-
-2. Hit `prefix + I` to fetch the plugin and source it. You should now be able to use the plugin.
-
-### Manual Installation
-
-1. Clone this repo:
-
-    ```console
-    $ git clone https://github.com/yardnsm/tmux-1password ~/some/path
-    ```
-
-2. Source the plugin in your `.tmux.conf` by adding the following to the bottom of the file:
-
-    ```
-    run-shell ~/some/path/plugin.tmux
-    ```
-
-3. Reload the environment by running:
-
-    ```console
-    $ tmux source-file ~/.tmux.conf
-    ```
-
-### Using older versions of 1Password's CLI
-
-If you're using an older version of the CLI (`< 2.0`), you can use this plugin via the
-[`legacy`](https://github.com/yardnsm/tmux-1password/tree/legacy) branch. For example, using TPM:
-
-```
-set -g @plugin 'yardnsm/tmux-1password#legacy'
+```tmux
+set -g @plugin 'KyTiXo/cmux-1password'
 ```
 
-## Usage
+Reload TPM. Hit `prefix + I`. Carry on.
 
-Initiate the plugin by using the keybind (`prefix + u` by default). If you haven't added an account
-to the 1Password's CLI, the plugin will prompt you to add one. You can also manage your connected
-accounts manually using the [`op account`
-command](https://developer.1password.com/docs/cli/reference/management-commands/account).
+### Manual
 
-Once you have an account, while initiating the plugin a new pane will be opened in the bottom,
-listing the appropriate login items. Press `<Enter>` to choose a login item, and its password will
-automatically be filled.
-
-You can also press `Ctrl+u` while hovering an item to fill a [One-Time
-Password](https://support.1password.com/one-time-passwords/).
-
-You may be required to perform a re-login (directly in the opened pane) since the 1Password CLI's
-sessions expires automatically after 30 minutes of inactivity.
-
-### Biometric Unlock
-
-For supported systems, you can enable [signing in with biometric
-unlock](https://developer.1password.com/docs/cli/about-biometric-unlock). When biometric unlock is
-enabled, you'll be prompted to authorize using it when then plugin is being initiated.
-
-## Configuration
-
-Customize this plugin by setting these options in your `.tmux.conf` file. Make sure to reload the
-environment afterwards.
-
-#### Changing the default key-binding for this plugin
-
-```
-set -g @1password-key 'x'
+```bash
+git clone https://github.com/KyTiXo/cmux-1password ~/.config/cmux-1password
 ```
 
-Default: `'u'`
-
-#### Setting the sign-in account
-
-1Password's CLI allows signing in with [multiple
-accounts](https://developer.1password.com/docs/cli/use-multiple-accounts/), while this plugin is
-able to work against a single one. You can specify which account to use using this option.
-
-As per the
-[documentation](https://developer.1password.com/docs/cli/use-multiple-accounts/#find-an-account-shorthand-and-id),
-you can use the shorthand, sign-in address, or account ID to refer to a specific account.
-
-```
-set -g @1password-account 'acme'
+```tmux
+run-shell ~/.config/cmux-1password/plugin.tmux
 ```
 
-Default: `'my'`
+Then:
 
-#### Setting the default vault
-
-```
-set -g @1password-vault 'work'
+```bash
+tmux source-file ~/.tmux.conf
 ```
 
-Default: `''` (all vaults)
+## Config
 
-#### Copy the password to clipboard
-
-By default, the plugin will use `send-keys` to send the selected password to the targeted pane. By
-setting the following, the password will be copied to the system's clipboard, which will be cleared
-after 30 seconds.
-
-```
-set -g @1password-copy-to-clipboard 'on'
-```
-
-Default: `'off'`
-
-#### Filter items via tags
-
-By default, all of the items will be shown. You can use this option (comma-separated) if you want to
-list items that has specific tags.
-
-```
-set -g @1password-filter-tags 'development,servers'
+```tmux
+set -g @1password-key 'u'
+set -g @1password-account 'my'
+set -g @1password-vault ''
+set -g @1password-filter-tags ''
+set -g @1password-copy-to-clipboard 'off'
+set -g @1password-debug 'off'
 ```
 
-Default: `''` (no tag filtering)
+## cmux Notes
 
-#### Debug mode
+Inside a real `cmux` terminal, this repo treats:
 
-If you're having any trouble with the plugin and would like to debug it's output in a more
-convenient way, this option will prevent the pane from being closed.
+- `CMUX_WORKSPACE_ID` as the workspace boolean
+- `CMUX_SURFACE_ID` as the secret send target
+- `cmux set-status` / `cmux set-progress` as the "hey idiot unlock 1Password" workspace flag
 
-```sh
-set -g @1password-debug 'on'
+If 1Password blocks on sign-in or biometric unlock, the workspace can light up without leaking the secret itself.
 
-# Or running the following withing tmux:
-tmux set-option -g @1password-debug "on"
+## Smoke Test
 
+Run this inside a `cmux` terminal:
+
+```bash
+./smoke-test.sh
 ```
 
-## Prior art
+What it does:
 
-Also see:
+- pings `cmux`
+- prints `identify` / current workspace state
+- creates a new left split
+- renames the tab to `1Password Smoke`
+- sets a status pill + progress bar
+- sends a harmless notification
+- dumps pane / surface / sidebar state so you can inspect the graph
 
-- [sudolikeaboss](https://github.com/ravenac95/sudolikeaboss)
+Cleanup mode:
 
----
+```bash
+./smoke-test.sh --cleanup
+```
+
+## Security
+
+- no secret text is written to README-land logs
+- selected item lookup uses item IDs, not title-grep roulette
+- session token cache uses a private temp file, not a fixed world-readable path
+
+## Demo
+
+Drop in a screenshot or clip later. Repo is staged for it.
+
+## Prior Art
+
+- [`yardnsm/tmux-1password`](https://github.com/yardnsm/tmux-1password)
+- [`manaflow-ai/cmux`](https://github.com/manaflow-ai/cmux)
 
 ## License
 
-MIT © [Yarden Sod-Moriah](http://yardnsm.net/)
+MIT

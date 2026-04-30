@@ -3,9 +3,19 @@
 # ------------------------------------------------------------------------------
 
 declare -r EXPECTED_MIN_OP_CLI_VERSION="2.0.0"
-declare -r TMP_TOKEN_FILE="$HOME/.op_tmux_token_tmp"
+declare __OP_SESSION_FILE=""
 
 # ------------------------------------------------------------------------------
+
+op::session_file() {
+  if [[ -z "$__OP_SESSION_FILE" ]]; then
+    __OP_SESSION_FILE="$(mktemp "${TMPDIR:-/tmp}/cmux-1password.XXXXXX")"
+    chmod 600 "$__OP_SESSION_FILE"
+    trap 'rm -f "$__OP_SESSION_FILE"' EXIT
+  fi
+
+  echo "$__OP_SESSION_FILE"
+}
 
 op::verify_version() {
   local op_version="$(op --version)"
@@ -23,19 +33,25 @@ op::verify_version() {
 }
 
 op::verify_session() {
-  local connected_accounts_count="$(( $(op account list | wc -l) - 1 ))"
+  local connected_accounts_count
+  connected_accounts_count="$(
+    op account list --format json 2> /dev/null \
+      | jq 'length' 2> /dev/null
+  )"
+  connected_accounts_count="${connected_accounts_count:-0}"
 
   if [[ "$connected_accounts_count" -le 0 ]]; then
+    tmux::set_1password_status "account setup"
+    tmux::notify_1password "1Password" "Account setup required"
     prompt::ask "You haven't added any accounts to 1Password CLI. Would you like to add one now?"
 
     if prompt::answer_is_yes; then
-      op account add
-
-      if [[ $? -ne 0 ]]; then
+      if ! op account add; then
         return 1
       fi
 
       tput clear
+      tmux::clear_1password_status
       tmux::display_message "Successfully added new account."
     else
       return 1
@@ -48,22 +64,36 @@ op::verify_session() {
 }
 
 op::signin() {
+  local -r SESSION_FILE="$(op::session_file)"
+  local exit_code
+
+  tmux::set_1password_status "unlock required"
+  tmux::set_1password_progress "0.5" "Waiting for 1Password"
+
   op signin \
     --cache \
     --force \
     --raw \
     --account="$(options::op_account)" \
-    --session="$(op::get_session)" > "$TMP_TOKEN_FILE"
+    --session="$(op::get_session)" > "$SESSION_FILE"
 
   exit_code=$?
 
   tput clear
 
+  if [[ "$exit_code" -eq 0 ]]; then
+    tmux::clear_1password_status
+    tmux::clear_1password_progress
+  else
+    tmux::set_1password_status "unlock failed"
+    tmux::notify_1password "1Password" "Unlock failed or was cancelled"
+  fi
+
   return $exit_code
 }
 
 op::get_session() {
-  cat "$TMP_TOKEN_FILE" 2> /dev/null
+  cat "$(op::session_file)" 2> /dev/null
 }
 
 op::get_all_items() {
@@ -81,7 +111,7 @@ op::get_all_items() {
       ]
     | map(
         [ .title, .id ]
-        | join(\",\")
+        | @tsv
       )
     | .[]
   "

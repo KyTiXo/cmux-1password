@@ -19,10 +19,11 @@ source "./options.sh"
 
 main() {
   local -r ACTIVE_PANE="$1"
+  local -r TARGET_ID="$(tmux::target_id "$ACTIVE_PANE")"
 
   local items
+  local key_pressed
   local selected_item
-  local selected_item_name
   local selected_item_uuid
   local selected_item_password
   local synchronize_panes_reset_value
@@ -50,15 +51,14 @@ main() {
 
   synchronize_panes_reset_value=$(tmux::disable_synchronize_panes)
 
-  IFS=$'\n' read -r -d '' -a selection < <(echo "$items" | awk -F ',' '{ print $1 }' | fzf "${fzf_opts[@]}")
+  IFS=$'\n' read -r -d '' -a selection < <(printf '%s\n' "$items" | fzf "${fzf_opts[@]}")
   key_pressed="${selection[0]}"
   selected_item="${selection[1]}"
 
   tmux::set_synchronize_panes "${synchronize_panes_reset_value}"
 
   if [[ -n "${selected_item}" ]]; then
-    selected_item_name=${selected_item#*,}
-    selected_item_uuid="$(echo "$items" | grep "^$selected_item_name," | awk -F ',' '{ print $2 }')"
+    IFS=$'\t' read -r _ selected_item_uuid <<< "$selected_item"
 
     case ${key_pressed} in
       enter)
@@ -88,11 +88,11 @@ main() {
     else
 
       # Use `send-keys`
-      tmux send-keys -t "$ACTIVE_PANE" "$selected_item_password"
+      tmux::send_secret "$TARGET_ID" "$selected_item_password"
     fi
 
     if options::debug_mode; then
-      echo "tmux-1password: @1password-debug is on. Press [ENTER] to continue."
+      echo "cmux-1password: @1password-debug is on. Press [ENTER] to continue."
       read -rs
     fi
   fi

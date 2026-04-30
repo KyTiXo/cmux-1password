@@ -18,9 +18,15 @@ clipboard::clear() {
   local -r SEC="$1"
 
   if [[ "$(uname)" == "Darwin" ]] && cmd::exists "pbcopy"; then
-    tmux run-shell -b "sleep $SEC && echo '' | pbcopy"
+    (
+      sleep "$SEC"
+      echo '' | pbcopy
+    ) &> /dev/null &
   elif [[ "$(uname)" == "Linux" ]] && cmd::exists "xclip"; then
-    tmux run-shell -b "sleep $SEC && echo '' | xclip -i"
+    (
+      sleep "$SEC"
+      echo '' | xclip -i
+    ) &> /dev/null &
   else
     return 1
   fi
